@@ -4,8 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/components/app_scaffold.dart';
-import '../../../../core/components/app_card.dart';
-import '../../../../core/components/app_text.dart';
 import '../../../../core/theme/theme_x.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../providers/auth_provider.dart';
@@ -15,11 +13,6 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-
-    final width = MediaQuery.of(context).size.width;
-    final cols = width < 600 ? 2 : (width < 1024 ? 3 : 4);
-    final ratio = width < 600 ? 1.0 : 4 / 3;
 
     return AppScaffold(
       appBar: AppBar(

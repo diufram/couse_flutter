@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/product.dart';
 import '../../domain/repositories/product_repository.dart';
-import '../../data/dto/product_create_dto.dart';
-import '../../data/dto/product_update_dto.dart';
 
 class ProductsProvider extends ChangeNotifier {
   final ProductRepository repo;
@@ -12,12 +10,14 @@ class ProductsProvider extends ChangeNotifier {
   bool loading = false;
   String? error;
 
-  Future<void> fetchAll({int page = 1, int limit = 20, String? q}) async {
+  /// Obtener todos los productos
+  Future<void> fetchAll({String? q}) async {
     loading = true;
     error = null;
     notifyListeners();
+
     try {
-      items = await repo.list(page: page, limit: limit, q: q);
+      items = await repo.list(q: q);
     } catch (e, st) {
       debugPrint('fetchAll error: $e\n$st');
       error = 'Error al cargar productos';
@@ -27,39 +27,45 @@ class ProductsProvider extends ChangeNotifier {
     }
   }
 
-  Future<Product?> create(ProductCreateDto dto) async {
+  /// Crear producto
+/*   Future<Product?> create(Product product) async {
     try {
-      final product = await repo.create(dto);
-      items = [product, ...items];
+      final created = await repo.create(product);
+      items = [created, ...items];
       notifyListeners();
-      return product;
-    } catch (e) {
+      return created;
+    } catch (e, st) {
+      debugPrint('create error: $e\n$st');
       error = 'Error al crear producto';
       notifyListeners();
       return null;
     }
-  }
+  } */
 
-  Future<Product?> update(int id, ProductUpdateDto dto) async {
+  /// Actualizar producto
+/*   Future<Product?> update(int id, Product product) async {
     try {
-      final updated = await repo.update(id, dto);
+      final updated = await repo.update(id, product);
       items = items.map((p) => p.id == id ? updated : p).toList();
       notifyListeners();
       return updated;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('update error: $e\n$st');
       error = 'Error al actualizar producto';
       notifyListeners();
       return null;
     }
   }
-
+ */
+  /// Eliminar producto
   Future<bool> delete(int id) async {
     try {
       await repo.delete(id);
       items.removeWhere((p) => p.id == id);
       notifyListeners();
       return true;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('delete error: $e\n$st');
       error = 'Error al eliminar producto';
       notifyListeners();
       return false;

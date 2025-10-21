@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../../domain/entities/product.dart';
 import '../provider/product_provider.dart';
 
@@ -20,7 +19,6 @@ class ProductListView extends StatefulWidget {
     this.padding,
     this.showSearch = true,
     this.initialQuery,
-    this.limit = 20,
   });
 
   final ValueChanged<Product>? onTap;
@@ -29,7 +27,6 @@ class ProductListView extends StatefulWidget {
   final EdgeInsets? padding;
   final bool showSearch;
   final String? initialQuery;
-  final int limit;
 
   @override
   State<ProductListView> createState() => _ProductListViewState();
@@ -45,11 +42,12 @@ class _ProductListViewState extends State<ProductListView> {
     if (widget.initialQuery != null) {
       _searchCtrl.text = widget.initialQuery!;
     }
-    // fetch inicial
+
+    // Fetch inicial
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final p = context.read<ProductsProvider>();
-      p.fetchAll(page: 1, limit: widget.limit, q: _q);
+      context.read<ProductsProvider>().fetchAll(q: _q);
     });
+
     _searchCtrl.addListener(_onSearchChanged);
   }
 
@@ -69,8 +67,7 @@ class _ProductListViewState extends State<ProductListView> {
   void _onSearchChanged() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), () {
-      final p = context.read<ProductsProvider>();
-      p.fetchAll(page: 1, limit: widget.limit, q: _q);
+      context.read<ProductsProvider>().fetchAll(q: _q);
     });
   }
 
@@ -82,7 +79,6 @@ class _ProductListViewState extends State<ProductListView> {
 
   double _aspectRatioForWidth(double w) {
     return w < 600 ? 1.0 : 4 / 3;
-    // Ajusta si tus cards necesitan otra proporción
   }
 
   @override
@@ -117,8 +113,7 @@ class _ProductListViewState extends State<ProductListView> {
 
         Expanded(
           child: RefreshIndicator(
-            onRefresh: () =>
-                products.fetchAll(page: 1, limit: widget.limit, q: _q),
+            onRefresh: () => products.fetchAll(q: _q),
             child: Builder(
               builder: (_) {
                 if (products.loading && products.items.isEmpty) {
@@ -129,8 +124,7 @@ class _ProductListViewState extends State<ProductListView> {
                   return _CenteredMessage(
                     icon: Icons.error_outline,
                     message: products.error!,
-                    onRetry: () =>
-                        products.fetchAll(page: 1, limit: widget.limit, q: _q),
+                    onRetry: () => products.fetchAll(q: _q),
                   );
                 }
 
@@ -177,12 +171,13 @@ class _ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final price = product.price; // String (ej: "199.90")
     final imageUrl = product.imageUrl;
+    final price = product.price;
 
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: onTap == null ? null : () => onTap!(product),
+      onTap: () {
+      },
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 1.5,
@@ -190,7 +185,6 @@ class _ProductCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Column(
             children: [
-              // Imagen
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
@@ -215,7 +209,6 @@ class _ProductCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              // Nombre
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -226,7 +219,6 @@ class _ProductCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              // Precio + stock
               Row(
                 children: [
                   Text(
@@ -263,9 +255,8 @@ class _CenteredProgress extends StatelessWidget {
   const _CenteredProgress();
 
   @override
-  Widget build(BuildContext context) {
-    return const Center(child: CircularProgressIndicator());
-  }
+  Widget build(BuildContext context) =>
+      const Center(child: CircularProgressIndicator());
 }
 
 class _CenteredMessage extends StatelessWidget {
@@ -284,32 +275,35 @@ class _CenteredMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 42),
-            const SizedBox(height: 12),
-            Text(message, style: t.titleMedium, textAlign: TextAlign.center),
-            if (secondary != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                secondary!,
-                style: t.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
-            if (onRetry != null) ...[
+    return InkWell(
+      onTap: () {},
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 42),
               const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reintentar'),
-              ),
+              Text(message, style: t.titleMedium, textAlign: TextAlign.center),
+              if (secondary != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  secondary!,
+                  style: t.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              if (onRetry != null) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar'),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

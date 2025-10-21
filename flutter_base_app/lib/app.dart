@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
     final router = createRouter(context);
 
     return MaterialApp.router(
-      title: 'Theming + Typography Control',
+      title: 'App Base',
       themeMode: tp.mode,
       theme: AppTheme.light(fontScale: tp.fontScale, fontFamily: tp.fontFamily),
       darkTheme: AppTheme.dark(
