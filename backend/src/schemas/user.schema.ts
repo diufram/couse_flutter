@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/* =========================
+ *         USERS
+ * ========================= */
 export const registerSchema = z.object({
   body: z.object({
     email: z.string().email(),
@@ -23,8 +26,10 @@ export const userIdParamSchema = z.object({
 
 export const userUpdateSchema = z.object({
   params: z.object({ id: z.string().regex(/^\d+$/) }),
-  body: z.object({
-    name: z.string().min(2).optional(),
-    password: z.string().min(6).optional(),
-  }).refine((d) => Object.keys(d).length > 0, { message: "Sin cambios" }),
+  body: z
+    .object({
+      name: z.string().min(2).optional(),
+      password: z.string().min(6).optional(),
+    })
+    .refine((d) => Object.keys(d).length > 0, { message: "Sin cambios" }),
 });

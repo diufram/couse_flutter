@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"         // o "sqlite" si prefieres
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -7,30 +7,70 @@ generator client {
   provider = "prisma-client-js"
 }
 
+/* ========= MODELOS PRINCIPALES ========= */
+
 model User {
   id        Int       @id @default(autoincrement())
   email     String    @unique
   name      String
   password  String
   createdAt DateTime  @default(now())
-  products  Product[]
+
+  orders    Order[]
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+
+  products    Product[]
 }
 
 model Product {
   id          Int       @id @default(autoincrement())
   name        String
   description String?
-  imageUrl    String?   // público: p.ej. "/uploads/products/xxx.webp"
-  imageKey    String?   // nombre del archivo dentro de /uploads/products
-  mime        String?
-  size        Int?
-  price       Decimal    @db.Decimal(10,2)
-  stock       Int        @default(0)
-  isActive    Boolean    @default(true)
-  ownerId     Int?
-  owner       User?      @relation(fields: [ownerId], references: [id])
-  createdAt   DateTime   @default(now())
-  
-  @@index([ownerId])
+  imageUrl    String?
+  price       Decimal   @db.Decimal(10,2)
+  stock       Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  categoryId  Int
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  items       OrderItem[]
+
   @@index([name])
+  @@index([categoryId])
+}
+
+/* ========= PEDIDOS ========= */
+
+model Order {
+  id         Int         @id @default(autoincrement())
+  createdAt  DateTime    @default(now())
+  subtotal   Decimal     @db.Decimal(10,2)
+  total      Decimal     @db.Decimal(10,2)
+
+  userId     Int?
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  items      OrderItem[]
+}
+
+model OrderItem {
+  id         Int       @id @default(autoincrement())
+  orderId    Int
+  productId  Int
+  quantity   Int
+  subtotal   Decimal   @db.Decimal(10,2)
+
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, productId])
+  @@index([productId])
 }

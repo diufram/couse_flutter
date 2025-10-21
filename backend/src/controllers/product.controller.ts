@@ -1,3 +1,4 @@
+// controllers/products.controller.ts
 import path from "path";
 import sharp from "sharp";
 import fs from "fs/promises";
@@ -5,17 +6,11 @@ import { Response } from "express";
 import { prisma } from "../lib/prisma";
 import { AuthRequest } from "../middleware/auth";
 
-/**
- * 📁 Directorio base de imágenes
- */
 const uploadsDir = path.join(process.cwd(), "uploads", "products");
 
-/**
- * 🧾 Listar productos con filtros opcionales
- * ?q=texto&minPrice=100&maxPrice=500&onlyActive=true
- */
+/** Listar productos (?q, minPrice, maxPrice, onlyActive, categoryId) */
 export const listProducts = async (req: AuthRequest, res: Response) => {
-  const { q, minPrice, maxPrice, onlyActive } = req.query as any;
+  const { q, minPrice, maxPrice, onlyActive, categoryId } = req.query as any;
 
   const where: any = {};
   if (q) where.name = { contains: String(q), mode: "insensitive" };
@@ -25,29 +20,20 @@ export const listProducts = async (req: AuthRequest, res: Response) => {
     if (minPrice) where.price.gte = Number(minPrice);
     if (maxPrice) where.price.lte = Number(maxPrice);
   }
+  if (categoryId) where.categoryId = Number(categoryId);
 
   const products = await prisma.product.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      price: true,
-      stock: true,
-      imageUrl: true,
-      isActive: true,
-      createdAt: true,
-      owner: { select: { id: true, name: true, email: true } },
-    },
+    include: {
+      category: true, // 🔥 Trae TODO el objeto de la categoría
+    }
   });
 
   res.json(products);
 };
 
-/**
- * 📦 Obtener un producto por ID
- */
+/** Obtener producto por ID */
 export const getProduct = async (req: AuthRequest, res: Response) => {
   const id = Number(req.params.id);
   const product = await prisma.product.findUnique({
@@ -61,7 +47,7 @@ export const getProduct = async (req: AuthRequest, res: Response) => {
       imageUrl: true,
       isActive: true,
       createdAt: true,
-      owner: { select: { id: true, name: true, email: true } },
+      category: { select: { id: true, name: true } },
     },
   });
 
@@ -69,73 +55,75 @@ export const getProduct = async (req: AuthRequest, res: Response) => {
   res.json(product);
 };
 
-/**
- * 🛒 Crear un nuevo producto
- */
+/** Crear producto (categoryId requerido) */
 export const createProduct = async (req: AuthRequest, res: Response) => {
-  const { name, description, price, stock } = req.body;
+  const { name, description, price, stock, categoryId, isActive } = req.body;
+
+  const category = await prisma.category.findUnique({ where: { id: Number(categoryId) } });
+  if (!category) return res.status(400).json({ error: "categoryId inválido" });
+
   const newProduct = await prisma.product.create({
     data: {
       name,
       description,
-      price,
+      price: Number(price),
       stock: stock ?? 0,
-      ownerId: req.user!.id,
+      categoryId: Number(categoryId),
+      isActive: typeof isActive === "boolean" ? isActive : true,
     },
   });
   res.status(201).json(newProduct);
 };
 
-/**
- * ✏️ Actualizar un producto existente
- */
+/** Actualizar producto */
 export const updateProduct = async (req: AuthRequest, res: Response) => {
   const id = Number(req.params.id);
-  const product = await prisma.product.findUnique({
-    where: { id },
-    select: { ownerId: true },
-  });
+  const exists = await prisma.product.findUnique({ where: { id }, select: { id: true } });
+  if (!exists) return res.status(404).json({ error: "Producto no encontrado" });
 
-  if (!product) return res.status(404).json({ error: "Producto no encontrado" });
-  if (product.ownerId !== req.user!.id)
-    return res.status(403).json({ error: "No tienes permiso" });
+  const { name, description, price, stock, isActive, categoryId } = req.body;
 
-  const { name, description, price, stock, isActive } = req.body;
+  if (categoryId) {
+    const cat = await prisma.category.findUnique({ where: { id: Number(categoryId) } });
+    if (!cat) return res.status(400).json({ error: "categoryId inválido" });
+  }
+
   const updated = await prisma.product.update({
     where: { id },
-    data: { name, description, price, stock, isActive },
+    data: {
+      name,
+      description,
+      price: price !== undefined ? Number(price) : undefined,
+      stock,
+      isActive,
+      categoryId: categoryId ? Number(categoryId) : undefined,
+    },
   });
   res.json(updated);
 };
 
-/**
- * 🗑️ Eliminar un producto
- */
+/** Eliminar producto (borra imagen si existe) */
 export const deleteProduct = async (req: AuthRequest, res: Response) => {
   const id = Number(req.params.id);
   const product = await prisma.product.findUnique({
     where: { id },
-    select: { ownerId: true, imageKey: true },
+    select: { id: true, imageUrl: true },
   });
 
   if (!product) return res.status(404).json({ error: "Producto no encontrado" });
-  if (product.ownerId !== req.user!.id)
-    return res.status(403).json({ error: "No tienes permiso" });
 
-  // Borrar imagen asociada
-  if (product.imageKey) {
+  if (product.imageUrl) {
     try {
-      await fs.unlink(path.join(uploadsDir, product.imageKey));
-    } catch {}
+      const filename = path.basename(product.imageUrl);
+      await fs.unlink(path.join(uploadsDir, filename));
+    } catch { }
   }
 
   await prisma.product.delete({ where: { id } });
   res.status(204).send();
 };
 
-/**
- * 🖼️ Subir o reemplazar la imagen del producto
- */
+/** Subir/Reemplazar imagen del producto (solo imageUrl en DB) */
 export const uploadProductImage = async (req: AuthRequest, res: Response) => {
   const id = Number(req.params.id);
   const file = (req as any).file as Express.Multer.File;
@@ -143,70 +131,55 @@ export const uploadProductImage = async (req: AuthRequest, res: Response) => {
 
   const product = await prisma.product.findUnique({
     where: { id },
-    select: { id: true, ownerId: true, imageKey: true },
+    select: { id: true, imageUrl: true },
   });
-
   if (!product) return res.status(404).json({ error: "Producto no encontrado" });
-  if (product.ownerId !== req.user!.id)
-    return res.status(403).json({ error: "No tienes permiso" });
 
-  // Convertir a .webp optimizado
+  await fs.mkdir(uploadsDir, { recursive: true });
+
   const outKey = file.filename.replace(path.extname(file.filename), ".webp");
   const outPath = path.join(uploadsDir, outKey);
+
   await sharp(file.path).resize(1200).webp({ quality: 85 }).toFile(outPath);
+  try { await fs.unlink(file.path); } catch { }
 
-  // Borrar original temporal
-  try {
-    await fs.unlink(file.path);
-  } catch {}
-
-  // Borrar imagen anterior
-  if (product.imageKey) {
+  if (product.imageUrl) {
     try {
-      await fs.unlink(path.join(uploadsDir, product.imageKey));
-    } catch {}
+      const prev = path.join(uploadsDir, path.basename(product.imageUrl));
+      await fs.unlink(prev);
+    } catch { }
   }
 
-  const stats = await fs.stat(outPath);
   const imageUrl = `/uploads/products/${outKey}`;
-
   const updated = await prisma.product.update({
     where: { id },
-    data: {
-      imageUrl,
-      imageKey: outKey,
-      mime: "image/webp",
-      size: stats.size,
-    },
-    select: { id: true, imageUrl: true, mime: true, size: true },
+    data: { imageUrl },
+    select: { id: true, imageUrl: true },
   });
 
   res.json(updated);
 };
 
-/**
- * ❌ Eliminar imagen de un producto
- */
+/** Eliminar solo la imagen del producto */
 export const deleteProductImage = async (req: AuthRequest, res: Response) => {
   const id = Number(req.params.id);
   const product = await prisma.product.findUnique({
     where: { id },
-    select: { id: true, ownerId: true, imageKey: true },
+    select: { id: true, imageUrl: true },
   });
 
   if (!product) return res.status(404).json({ error: "Producto no encontrado" });
-  if (product.ownerId !== req.user!.id)
-    return res.status(403).json({ error: "No tienes permiso" });
 
-  if (product.imageKey) {
+  if (product.imageUrl) {
     try {
-      await fs.unlink(path.join(uploadsDir, product.imageKey));
-    } catch {}
+      const filepath = path.join(uploadsDir, path.basename(product.imageUrl));
+      await fs.unlink(filepath);
+    } catch { }
   }
 
   await prisma.product.update({
     where: { id },
-    data: { imageUrl: null, imageKey: null, mime: null, size: null },
+    data: { imageUrl: null },
   });
 
   res.status(204).send();
