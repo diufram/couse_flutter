@@ -6,25 +6,18 @@ part 'product.g.dart';
 
 @freezed
 abstract class Product with _$Product {
-  const Product._(); // permite agregar getters personalizados
+    const factory Product({
+        required int id,
+        required String name,
+        required String description,
+        required String imageUrl,
+        required String price,
+        required int stock,
+        required bool isActive,
+        required DateTime createdAt,
+        required int categoryId,
+        required Category category,
+    }) = _Product;
 
-  const factory Product({
-    required int id,
-    required String name,
-    required String description,
-    required String imageUrl,
-    required String price,
-    required int stock,
-    required bool isActive,
-    required DateTime createdAt,
-    required int categoryId,
-    required Category category,
-  }) = _Product;
-
-  factory Product.fromJson(Map<String, dynamic> json) =>
-      _$ProductFromJson(json);
-
-  // ----- Getters de dominio opcionales -----
-  double get priceDouble => double.tryParse(price) ?? 0.0;
-  bool get isAvailable => isActive && stock > 0;
+    factory Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);
 }
